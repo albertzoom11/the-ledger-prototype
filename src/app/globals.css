@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-canvas: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-ink: #10151c;
+  --color-muted: #5b6672;
+  --color-line: #dfe3e8;
+  --color-accent: #1f4fd8;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", "Menlo", monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Dense internal-tool defaults */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+dialog::backdrop {
+  background: rgb(16 21 28 / 0.45);
+}
+
+@keyframes ledger-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.ledger-skeleton {
+  animation: ledger-pulse 1.4s ease-in-out infinite;
+}
