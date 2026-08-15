@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import clsx from "clsx";
 import { can, type Actor } from "../auth/actor";
 import { ROLE_LABELS } from "../auth/roles";
 import { LEDGER_APPS } from "./navigation";
 import { ActorSwitcher } from "./ActorSwitcher";
+import { SideNav, type SideNavGroup } from "./SideNav";
 
 /**
  * Ledger platform: the shell every internal application renders inside.
@@ -14,14 +14,20 @@ import { ActorSwitcher } from "./ActorSwitcher";
 export function AppShell({
   actor,
   actors,
-  pathname,
   children,
 }: {
   actor: Actor;
   actors: Actor[];
-  pathname: string;
   children: ReactNode;
 }) {
+  const groups: SideNavGroup[] = LEDGER_APPS.map((app) => ({
+    key: app.key,
+    name: app.name,
+    items: app.items.filter(
+      (item) => !item.permission || can(actor, item.permission),
+    ),
+  })).filter((group) => group.items.length > 0);
+
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 flex h-12 items-center justify-between gap-4 border-b border-line bg-surface px-4">
@@ -51,40 +57,7 @@ export function AppShell({
 
       <div className="flex flex-1 flex-col md:flex-row">
         <nav className="shrink-0 border-b border-line bg-surface px-3 py-3 md:w-56 md:border-b-0 md:border-r">
-          {LEDGER_APPS.map((app) => {
-            const items = app.items.filter(
-              (item) => !item.permission || can(actor, item.permission),
-            );
-            if (items.length === 0) return null;
-            return (
-              <div key={app.key} className="mb-4">
-                <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted">
-                  {app.name}
-                </p>
-                <ul className="flex flex-wrap gap-1 md:flex-col">
-                  {items.map((item) => {
-                    const active =
-                      pathname === item.match || pathname.startsWith(`${item.match}/`);
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          className={clsx(
-                            "block rounded px-2 py-1.5 text-[13px]",
-                            active
-                              ? "bg-accent/10 font-medium text-accent"
-                              : "text-ink hover:bg-canvas",
-                          )}
-                        >
-                          {item.label}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          })}
+          <SideNav groups={groups} />
           <p className="px-2 text-[11px] leading-snug text-muted">
             Navigation is filtered by permission, and every action re-checks
             authorization on the server.

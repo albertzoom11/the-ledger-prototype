@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/ledger/shell/AppShell";
@@ -20,8 +19,6 @@ export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const seeded = databaseIsSeeded();
-  const headerList = await headers();
-  const pathname = headerList.get("x-ledger-pathname") ?? "/refunds";
 
   if (!seeded) {
     return (
@@ -43,7 +40,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        <AppShell actor={actor} actors={actors} pathname={pathname}>
+        <AppShell actor={actor} actors={actors}>
           {children}
         </AppShell>
       </body>

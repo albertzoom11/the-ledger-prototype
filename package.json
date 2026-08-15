@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^13.0.3",
     "clsx": "^2.1.1",
     "next": "^15.5.23",
     "react": "19.1.0",

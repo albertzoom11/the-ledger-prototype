@@ -1,6 +1,7 @@
 import {
   Filter,
   Row,
+  buildWhere,
   defineQuery,
   execute,
   optionalString,
@@ -95,6 +96,11 @@ export function findRefundById(id: string): RefundListItem | null {
   return selectOne(`${REFUND_SELECT} WHERE r.id = ?`, [id], mapRefund);
 }
 
+/**
+ * Per-status totals under the given filters. Callers pass every active filter
+ * except the status filter itself, so each tab shows how many rows it would
+ * yield for the current search.
+ */
 export function statusCounts(filters: Filter[] = []): Record<RefundStatus, number> {
   const counts: Record<RefundStatus, number> = {
     PENDING: 0,
@@ -102,16 +108,16 @@ export function statusCounts(filters: Filter[] = []): Record<RefundStatus, numbe
     APPROVED: 0,
     REJECTED: 0,
   };
+  const where = buildWhere(filters);
   const rows = selectAll<{ status: RefundStatus; total: number }>(
-    `SELECT r.status AS status, COUNT(*) AS total ${REFUND_FROM} GROUP BY r.status`,
-    [],
+    `SELECT r.status AS status, COUNT(*) AS total ${REFUND_FROM} ${where.sql} GROUP BY r.status`,
+    where.params,
     (row) => ({
       status: requireString(row, "status") as RefundStatus,
       total: requireNumber(row, "total"),
     }),
   );
   for (const row of rows) counts[row.status] = row.total;
-  void filters;
   return counts;
 }
 

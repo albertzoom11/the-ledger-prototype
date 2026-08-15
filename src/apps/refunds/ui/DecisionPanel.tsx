@@ -103,7 +103,15 @@ export function DecisionPanel({
       <div className="flex flex-wrap items-center gap-2">
         {(["APPROVE", "REJECT", "ESCALATE"] as const).map((decision) => {
           const option = optionFor(decision);
-          const disabled = !option?.allowed || isPending;
+          const noteTooShort =
+            Boolean(option?.noteRequired) &&
+            note.trim().length < MIN_NOTE_LENGTH;
+          const disabled = !option?.allowed || noteTooShort || isPending;
+          const unavailableReason = option?.allowed
+            ? noteTooShort
+              ? `Requires a note of at least ${MIN_NOTE_LENGTH} characters`
+              : undefined
+            : option?.reason;
           return (
             <Button
               key={decision}
@@ -115,7 +123,7 @@ export function DecisionPanel({
                     : "secondary"
               }
               disabled={disabled}
-              title={option?.allowed ? undefined : option?.reason}
+              title={unavailableReason}
               onClick={() => {
                 setError(undefined);
                 setPendingDecision(decision);

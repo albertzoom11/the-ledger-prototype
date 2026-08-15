@@ -60,7 +60,11 @@ function parseAmountToCents(value: string | undefined): number | null {
   return Number.isFinite(parsed) ? Math.round(parsed * 100) : null;
 }
 
-export function buildQueueFilters(query: RefundQueueQuery): Filter[] {
+export function buildQueueFilters(
+  query: RefundQueueQuery,
+  options: { includeStatus?: boolean } = {},
+): Filter[] {
+  const { includeStatus = true } = options;
   const filters: Filter[] = [];
 
   if (query.q?.trim()) {
@@ -70,7 +74,11 @@ export function buildQueueFilters(query: RefundQueueQuery): Filter[] {
       value: query.q,
     });
   }
-  if (query.status && (REFUND_STATUSES as readonly string[]).includes(query.status)) {
+  if (
+    includeStatus &&
+    query.status &&
+    (REFUND_STATUSES as readonly string[]).includes(query.status)
+  ) {
     filters.push({ column: "r.status", op: "=", value: query.status });
   }
   if (query.reason && (REFUND_REASONS as readonly string[]).includes(query.reason)) {
@@ -133,7 +141,7 @@ export function listRefundQueue(
 
   return {
     page,
-    counts: statusCounts(),
+    counts: statusCounts(buildQueueFilters(query, { includeStatus: false })),
     sort: { key: sortKey, direction },
     flagsById,
   };
