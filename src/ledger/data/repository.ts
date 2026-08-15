@@ -167,12 +167,13 @@ export function selectAll<TEntity>(
     .map(map);
 }
 
+/** Returns the number of affected rows, so callers can guard conditional writes. */
 export function execute(
   sql: string,
   params: SqlParam[],
   db: Database = getDb(),
-): void {
-  db.prepare<SqlParam[]>(sql).run(...params);
+): number {
+  return db.prepare<SqlParam[]>(sql).run(...params).changes;
 }
 
 export function requireString(row: Row, key: string): string {

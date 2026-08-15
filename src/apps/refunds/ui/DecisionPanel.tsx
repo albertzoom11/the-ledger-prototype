@@ -7,6 +7,7 @@ import { Button } from "@/ledger/ui/primitives";
 import { formatMoney } from "@/ledger/ui/format";
 import { submitRefundDecision } from "../service/actions";
 import { MIN_NOTE_LENGTH } from "../domain/rules";
+import type { RefundStatus } from "../domain/types";
 
 type Decision = "APPROVE" | "REJECT" | "ESCALATE";
 
@@ -15,6 +16,17 @@ export interface DecisionOption {
   allowed: boolean;
   reason?: string;
   noteRequired: boolean;
+}
+
+function SuccessBanner({ message }: { message: string }) {
+  return (
+    <p
+      role="status"
+      className="rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[12px] text-emerald-800"
+    >
+      {message}
+    </p>
+  );
 }
 
 const LABEL: Record<Decision, string> = {
@@ -34,12 +46,14 @@ export function DecisionPanel({
   currency,
   options,
   terminal,
+  expectedStatus,
 }: {
   refundId: string;
   amountCents: number;
   currency: string;
   options: DecisionOption[];
   terminal: boolean;
+  expectedStatus: RefundStatus;
 }) {
   const [note, setNote] = useState("");
   const [pendingDecision, setPendingDecision] = useState<Decision | null>(null);
@@ -49,10 +63,13 @@ export function DecisionPanel({
 
   if (terminal) {
     return (
-      <p className="text-muted">
-        This refund has reached a terminal state. Its decision and audit history
-        are immutable; a new request must be created to refund again.
-      </p>
+      <div className="flex flex-col gap-2">
+        {success && <SuccessBanner message={success} />}
+        <p className="text-muted">
+          This refund has reached a terminal state. Its decision and audit
+          history are immutable; a new request must be created to refund again.
+        </p>
+      </div>
     );
   }
 
@@ -66,7 +83,12 @@ export function DecisionPanel({
     setError(undefined);
     setSuccess(undefined);
     startTransition(async () => {
-      const result = await submitRefundDecision(decision, refundId, note);
+      const result = await submitRefundDecision({
+        decision,
+        refundId,
+        note,
+        expectedStatus,
+      });
       setPendingDecision(null);
       if (result.status === "error") {
         setError(result.message);
@@ -94,9 +116,10 @@ export function DecisionPanel({
         />
       </Field>
 
-      {success && (
-        <p className="rounded border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[12px] text-emerald-800">
-          {success}
+      {success && <SuccessBanner message={success} />}
+      {isPending && (
+        <p className="text-[12px] text-muted" role="status">
+          Recording the decision and writing the audit event…
         </p>
       )}
 

@@ -1,6 +1,6 @@
-import { forbidden403 } from "@/app/admin/forbidden";
+import { forbidden403 } from "../forbidden";
 import { can } from "@/ledger/auth/actor";
-import { getCurrentActor } from "@/ledger/auth/session";
+import { requireActor } from "@/ledger/auth/session";
 import { listUsers } from "@/ledger/auth/users";
 import {
   PERMISSIONS,
@@ -11,7 +11,7 @@ import {
 import { Card, PageHeader } from "@/ledger/ui/primitives";
 
 export default async function AccessControlPage() {
-  const actor = await getCurrentActor();
+  const actor = await requireActor("/admin/access");
   if (!can(actor, "admin:access")) {
     return forbidden403("admin:access", actor.role);
   }

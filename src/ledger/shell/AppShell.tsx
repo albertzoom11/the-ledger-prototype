@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { can, type Actor } from "../auth/actor";
 import { ROLE_LABELS } from "../auth/roles";
 import { LEDGER_APPS } from "./navigation";
-import { ActorSwitcher } from "./ActorSwitcher";
+import { SignOutButton } from "./SignOutButton";
 import { SideNav, type SideNavGroup } from "./SideNav";
 
 /**
@@ -13,11 +13,9 @@ import { SideNav, type SideNavGroup } from "./SideNav";
 
 export function AppShell({
   actor,
-  actors,
   children,
 }: {
   actor: Actor;
-  actors: Actor[];
   children: ReactNode;
 }) {
   const groups: SideNavGroup[] = LEDGER_APPS.map((app) => ({
@@ -51,7 +49,7 @@ export function AppShell({
               {ROLE_LABELS[actor.role]} · {actor.email}
             </div>
           </div>
-          <ActorSwitcher actor={actor} actors={actors} />
+          <SignOutButton />
         </div>
       </header>
 

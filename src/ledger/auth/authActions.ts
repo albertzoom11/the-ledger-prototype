@@ -1,0 +1,127 @@
+"use server";
+
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { ANONYMOUS_ACTOR, recordAuditEvent } from "../audit/auditLog";
+import {
+  SESSION_COOKIE,
+  actorForSessionToken,
+  pruneExpiredSessions,
+  revokeSession,
+  signInWithPassword,
+} from "./sessionStore";
+
+/**
+ * Ledger platform: authentication transport.
+ *
+ * Both outcomes are audited, so a brute-force attempt is visible in the same
+ * audit log as refund decisions. The response never distinguishes an unknown
+ * email from a wrong password.
+ */
+
+const credentials = z.object({
+  email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
+  password: z.string().min(1, "Password is required"),
+  next: z.string().optional(),
+});
+
+export interface SignInState {
+  status: "idle" | "error";
+  message?: string;
+}
+
+const SAFE_NEXT = /^\/[A-Za-z0-9\-._~/?&=%]*$/;
+
+export async function signIn(
+  _prev: SignInState,
+  formData: FormData,
+): Promise<SignInState> {
+  const parsed = credentials.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+    next: formData.get("next") ?? undefined,
+  });
+
+  if (!parsed.success) {
+    return {
+      status: "error",
+      message: parsed.error.issues[0]?.message ?? "Enter your email and password",
+    };
+  }
+
+  const { email, password, next } = parsed.data;
+  const result = signInWithPassword(email, password);
+
+  if (!result.ok) {
+    recordAuditEvent(
+      {
+        entityType: "session",
+        entityId: email.toLowerCase(),
+        action: "auth.sign_in",
+        outcome: "DENIED",
+        metadata: { email: email.toLowerCase(), reason: result.reason },
+      },
+      ANONYMOUS_ACTOR,
+    );
+    return {
+      status: "error",
+      message:
+        result.reason === "LOCKED"
+          ? "Too many failed attempts. This account is temporarily locked — try again in a few minutes."
+          : "Incorrect email or password.",
+    };
+  }
+
+  pruneExpiredSessions();
+
+  const store = await cookies();
+  store.set(SESSION_COOKIE, result.session.token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: new Date(result.session.expiresAt),
+  });
+
+  const userAgent = (await headers()).get("user-agent");
+  recordAuditEvent(
+    {
+      entityType: "session",
+      entityId: result.actor.id,
+      action: "auth.sign_in",
+      metadata: {
+        email: result.actor.email,
+        role: result.actor.role,
+        userAgent: userAgent ?? "",
+      },
+    },
+    result.actor,
+  );
+
+  redirect(next && SAFE_NEXT.test(next) ? next : "/refunds");
+}
+
+export async function signOut(): Promise<void> {
+  const store = await cookies();
+  const token = store.get(SESSION_COOKIE)?.value;
+
+  if (token) {
+    const actor = actorForSessionToken(token);
+    if (actor) {
+      recordAuditEvent(
+        {
+          entityType: "session",
+          entityId: actor.id,
+          action: "auth.sign_out",
+          metadata: { email: actor.email },
+        },
+        actor,
+      );
+    }
+    revokeSession(token);
+  }
+
+  store.delete(SESSION_COOKIE);
+  redirect("/login");
+}
