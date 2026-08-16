@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { ANONYMOUS_ACTOR, recordAuditEvent } from "../audit/auditLog";
+import { safeNextPath } from "./redirects";
 import {
   SESSION_COOKIE,
   actorForSessionToken,
@@ -30,8 +31,6 @@ export interface SignInState {
   status: "idle" | "error";
   message?: string;
 }
-
-const SAFE_NEXT = /^\/[A-Za-z0-9\-._~/?&=%]*$/;
 
 export async function signIn(
   _prev: SignInState,
@@ -99,7 +98,7 @@ export async function signIn(
     result.actor,
   );
 
-  redirect(next && SAFE_NEXT.test(next) ? next : "/refunds");
+  redirect(safeNextPath(next));
 }
 
 export async function signOut(): Promise<void> {
