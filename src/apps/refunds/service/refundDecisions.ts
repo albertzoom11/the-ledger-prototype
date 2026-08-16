@@ -10,6 +10,7 @@ import { findRefundById, updateRefundState } from "../data/refundRepository";
 import {
   checkDecision,
   nextStatusFor,
+  permissionsForDecision,
   type RefundDecision,
 } from "../domain/rules";
 import { REFUND_STATUSES, type RefundListItem } from "../domain/types";
@@ -68,6 +69,12 @@ function makeDecisionAction(
   return defineAction<DecisionInput, DecisionOutput>({
     name: `refunds.${decision.toLowerCase()}`,
     permission,
+    // The amount that decides whether admin approval is needed is read from the
+    // stored refund, so a crafted payload cannot talk its way into an approval.
+    additionalPermissions: (input) =>
+      permissionsForDecision(loadRefund(input.refundId), decision).filter(
+        (required) => required !== permission,
+      ),
     input: decisionInput,
     handler: (input, { actor }) => {
       const refund = loadRefund(input.refundId);

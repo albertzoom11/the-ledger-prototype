@@ -80,7 +80,10 @@ Sign in as each demo account.
 
 Authentication and authorization stay separate: the session answers *who* the actor is,
 and `requirePermission` answers *what* they may do on every read and every mutation, so
-nothing here is UI-only authorization.
+nothing here is UI-only authorization. `npm run authz:check` proves it without a browser:
+it calls the services directly as each role, including a crafted payload that claims a
+small amount and an admin role. `docs/authorization.md` is the full model, the bypass
+tests and the production SSO migration path.
 
 ## Architecture
 
@@ -190,6 +193,7 @@ npm run dev         # http://localhost:3000 → /login, then /refunds
 
 ```bash
 npm test            # rule + authorization unit tests (vitest)
+npm run authz:check # authorization smoke check straight against the services
 npm run typecheck   # tsc --noEmit
 npm run lint        # eslint
 npm run build       # production build

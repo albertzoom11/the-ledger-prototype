@@ -16,7 +16,8 @@ import {
  * Any entity type can be audited; consumers never write to the table directly.
  */
 
-export type AuditOutcome = "SUCCESS" | "DENIED" | "REJECTED_BY_RULE";
+export const AUDIT_OUTCOMES = ["SUCCESS", "DENIED", "REJECTED_BY_RULE"] as const;
+export type AuditOutcome = (typeof AUDIT_OUTCOMES)[number];
 
 /** Sign-in attempts are audited before an identity exists, hence ANONYMOUS. */
 export type AuditActorRole = Role | "ANONYMOUS";

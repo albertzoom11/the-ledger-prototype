@@ -1,18 +1,12 @@
-import { listAuditEntityTypes, queryAuditEvents } from "../audit/auditLog";
+import { listAuditEvents } from "../audit/auditService";
 import { AuditTimeline } from "../audit/AuditTimeline";
 import type { Actor } from "../auth/actor";
-import { can } from "../auth/actor";
-import type { Filter } from "../data/repository";
+import { ForbiddenError } from "../auth/actor";
 import { Pagination } from "../ui/DataTable";
 import { FilterBar } from "../ui/FilterBar";
 import { Forbidden } from "../ui/Forbidden";
 import { titleCase } from "../ui/format";
-import {
-  listHref,
-  parsePage,
-  readListParams,
-  type SearchParams,
-} from "../ui/listView";
+import { listHref, readListParams, type SearchParams } from "../ui/listView";
 import { Card, PageHeader } from "../ui/primitives";
 
 /**
@@ -31,32 +25,19 @@ export async function AuditLogScreen({
   actor: Actor;
   searchParams: Promise<SearchParams>;
 }) {
-  if (!can(actor, "audit:view")) {
-    return <Forbidden permission="audit:view" role={actor.role} />;
-  }
-
   const params = readListParams(await searchParams, PARAM_KEYS);
-  const entityTypes = listAuditEntityTypes();
 
-  const filters: Filter[] = [];
-  if (params.q) {
-    filters.push({
-      op: "search",
-      columns: ["a.entity_id", "a.action", "a.metadata", "u.name"],
-      value: params.q,
-    });
+  // The service is the enforcement point; the screen only renders the denial.
+  let view;
+  try {
+    view = listAuditEvents(actor, params);
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return <Forbidden permission={error.permission} role={actor.role} />;
+    }
+    throw error;
   }
-  if (params.outcome) {
-    filters.push({ column: "a.outcome", op: "=", value: params.outcome });
-  }
-  if (params.entityType) {
-    filters.push({ column: "a.entity_type", op: "=", value: params.entityType });
-  }
-
-  const page = queryAuditEvents({
-    filters,
-    page: { page: parsePage(params.page), pageSize: 25 },
-  });
+  const { page, entityTypes } = view;
 
   return (
     <div className="flex flex-col gap-4">
