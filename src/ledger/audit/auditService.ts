@@ -1,12 +1,7 @@
 import { requirePermission, type Actor } from "../auth/actor";
 import type { Filter, Page } from "../data/repository";
 import { parsePage, type ListParams } from "../ui/listView";
-import {
-  AUDIT_OUTCOMES,
-  listAuditEntityTypes,
-  queryAuditEvents,
-  type AuditEvent,
-} from "./auditLog";
+import { AUDIT_OUTCOMES, listAuditEntityTypes, queryAuditEvents } from "./auditLog";
 
 /**
  * Read-side of the audit log. Reads are authorised here rather than in the
@@ -16,8 +11,10 @@ import {
 
 export const AUDIT_PAGE_SIZE = 25;
 
+export type AuditEventRow = ReturnType<typeof queryAuditEvents>["items"][number];
+
 export interface AuditLogView {
-  page: Page<AuditEvent>;
+  page: Page<AuditEventRow>;
   entityTypes: string[];
 }
 

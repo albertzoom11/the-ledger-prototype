@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { listAuditEvents } from "../audit/auditService";
-import { getAccessOverview } from "../auth/accessService";
-import { ForbiddenError } from "../auth/actor";
+import { listAuditEvents } from "@/ledger/audit/auditService";
+import { getAccessOverview } from "@/ledger/auth/accessService";
+import { ForbiddenError } from "@/ledger/auth/actor";
 import { accessPolicy } from "@/platform/access";
-import { ADMIN, REVIEWER, resetDatabase } from "@/test/fixtures";
+import { ADMIN, REVIEWER, resetDatabase } from "./fixtures";
 
 /**
  * Administrative *reads* are authorised in the service, so hiding the nav item
