@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentActor } from "@/ledger/auth/session";
+import { getCurrentUser } from "@/ledger/auth/session";
 import { LoginForm } from "@/ledger/auth/LoginForm";
 import { safeNextPath } from "@/ledger/auth/redirects";
 
@@ -11,7 +11,7 @@ export default async function LoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  if (await getCurrentActor()) redirect(safeNextPath(next));
+  if (await getCurrentUser()) redirect(safeNextPath(next));
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-10">

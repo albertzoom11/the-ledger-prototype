@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { auditTrailFor } from "@/ledger/audit/auditLog";
-import type { Actor } from "@/ledger/auth/actor";
 import { hashPassword } from "@/ledger/auth/password";
 import {
-  actorForSessionToken,
   createSession,
   revokeSession,
   signInWithPassword,
+  userForSessionToken,
 } from "@/ledger/auth/sessionStore";
+import { toActor, type UserRecord } from "@/ledger/auth/users";
 import { getDb } from "@/ledger/data/db";
+import { accessPolicy } from "@/platform/access";
+import { bootstrapLedger } from "@/platform/bootstrap";
 import { findRefundById } from "../data/refundRepository";
 import { decideRefund } from "./refundDecisions";
 
@@ -20,20 +22,31 @@ import { decideRefund } from "./refundDecisions";
 const PASSWORD = "test-password";
 const NOTE = "Checked the shipping evidence and applied the 30-day policy.";
 
-const reviewer: Actor = {
-  id: "usr_reviewer_1",
-  name: "Priya Raman",
-  email: "priya@ledger.test",
-  role: "REVIEWER",
-};
-const admin: Actor = {
-  id: "usr_admin_1",
-  name: "Sam Ortega",
-  email: "sam@ledger.test",
-  role: "ADMIN",
-};
+/**
+ * The actors are built the way the running app builds them: a stored user plus
+ * the permissions its role is granted by the installed app manifests.
+ */
+const reviewer = toActor(
+  {
+    id: "usr_reviewer_1",
+    name: "Priya Raman",
+    email: "priya@ledger.test",
+    role: "REVIEWER",
+  } satisfies UserRecord,
+  accessPolicy,
+);
+const admin = toActor(
+  {
+    id: "usr_admin_1",
+    name: "Sam Ortega",
+    email: "sam@ledger.test",
+    role: "ADMIN",
+  } satisfies UserRecord,
+  accessPolicy,
+);
 
 function seedFixtures(): void {
+  bootstrapLedger();
   const db = getDb();
   db.exec(`
     PRAGMA foreign_keys = OFF;
@@ -124,10 +137,10 @@ describe("authentication", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(actorForSessionToken(result.session.token)?.id).toBe(reviewer.id);
+    expect(userForSessionToken(result.session.token)?.id).toBe(reviewer.id);
 
     revokeSession(result.session.token);
-    expect(actorForSessionToken(result.session.token)).toBeNull();
+    expect(userForSessionToken(result.session.token)).toBeNull();
   });
 
   it("rejects a wrong password and an unknown email identically", () => {
@@ -159,7 +172,7 @@ describe("authentication", () => {
   it("treats an expired session as signed out", () => {
     const past = new Date(Date.now() - 48 * 3_600_000);
     const session = createSession(reviewer.id, past);
-    expect(actorForSessionToken(session.token)).toBeNull();
+    expect(userForSessionToken(session.token)).toBeNull();
   });
 });
 

@@ -1,6 +1,6 @@
 import type { Actor } from "@/ledger/auth/actor";
 import { can } from "@/ledger/auth/actor";
-import { ageInHours } from "@/ledger/ui/format";
+import { ageInHours } from "@/ledger/time";
 import type { RefundListItem, RefundStatus } from "./types";
 
 /**

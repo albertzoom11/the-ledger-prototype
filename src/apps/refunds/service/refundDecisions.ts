@@ -13,6 +13,7 @@ import {
   type RefundDecision,
 } from "../domain/rules";
 import { REFUND_STATUSES, type RefundListItem } from "../domain/types";
+import { REFUND_PERMISSIONS } from "../app";
 
 /**
  * Write-side of the refunds application.
@@ -62,7 +63,7 @@ function assertDecisionAllowed(
 
 function makeDecisionAction(
   decision: "APPROVE" | "REJECT" | "ESCALATE",
-  permission: "refunds:decide",
+  permission: typeof REFUND_PERMISSIONS.decide,
 ) {
   return defineAction<DecisionInput, DecisionOutput>({
     name: `refunds.${decision.toLowerCase()}`,
@@ -108,9 +109,11 @@ function makeDecisionAction(
   });
 }
 
-export const approveRefund = makeDecisionAction("APPROVE", "refunds:decide");
-export const rejectRefund = makeDecisionAction("REJECT", "refunds:decide");
-export const escalateRefund = makeDecisionAction("ESCALATE", "refunds:decide");
+const DECIDE = REFUND_PERMISSIONS.decide;
+
+export const approveRefund = makeDecisionAction("APPROVE", DECIDE);
+export const rejectRefund = makeDecisionAction("REJECT", DECIDE);
+export const escalateRefund = makeDecisionAction("ESCALATE", DECIDE);
 
 export function decideRefund(
   decision: "APPROVE" | "REJECT" | "ESCALATE",

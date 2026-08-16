@@ -3,6 +3,13 @@ import { requirePermission, type Actor } from "@/ledger/auth/actor";
 import { auditTrailFor } from "@/ledger/audit/auditLog";
 import type { Filter, Page } from "@/ledger/data/repository";
 import {
+  parseMoneyToCents,
+  parsePage,
+  resolveSort,
+  type SortState,
+} from "@/ledger/ui/listView";
+import { REFUND_PERMISSIONS } from "../app";
+import {
   findRefundById,
   queryRefunds,
   recentCustomerTransactions,
@@ -42,11 +49,11 @@ export interface RefundQueueQuery {
 export interface RefundQueueResult {
   page: Page<RefundListItem>;
   counts: Record<RefundStatus, number>;
-  sort: { key: RefundSortKey; direction: "asc" | "desc" };
+  sort: SortState<RefundSortKey>;
   flagsById: Record<string, RefundFlag[]>;
 }
 
-const SORT_KEYS: RefundSortKey[] = [
+const SORT_KEYS: readonly RefundSortKey[] = [
   "requestedAt",
   "amount",
   "status",
@@ -54,11 +61,10 @@ const SORT_KEYS: RefundSortKey[] = [
   "reviewedAt",
 ];
 
-function parseAmountToCents(value: string | undefined): number | null {
-  if (!value) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.round(parsed * 100) : null;
-}
+const DEFAULT_SORT: SortState<RefundSortKey> = {
+  key: "requestedAt",
+  direction: "desc",
+};
 
 export function buildQueueFilters(
   query: RefundQueueQuery,
@@ -87,11 +93,11 @@ export function buildQueueFilters(
   if (query.method?.trim()) {
     filters.push({ column: "t.payment_method", op: "=", value: query.method });
   }
-  const min = parseAmountToCents(query.minAmount);
+  const min = parseMoneyToCents(query.minAmount);
   if (min !== null) {
     filters.push({ column: "r.requested_amount_cents", op: ">=", value: min });
   }
-  const max = parseAmountToCents(query.maxAmount);
+  const max = parseMoneyToCents(query.maxAmount);
   if (max !== null) {
     filters.push({ column: "r.requested_amount_cents", op: "<=", value: max });
   }
@@ -122,18 +128,15 @@ export function listRefundQueue(
   actor: Actor,
   query: RefundQueueQuery,
 ): RefundQueueResult {
-  requirePermission(actor, "refunds:view");
+  requirePermission(actor, REFUND_PERMISSIONS.view);
 
-  const sortKey = SORT_KEYS.includes(query.sort as RefundSortKey)
-    ? (query.sort as RefundSortKey)
-    : "requestedAt";
-  const direction = query.dir === "asc" ? "asc" : "desc";
+  const sort = resolveSort(SORT_KEYS, query, DEFAULT_SORT);
   const filters = buildQueueFilters(query);
 
   const page = queryRefunds({
     filters,
-    sort: { key: sortKey, direction },
-    page: { page: Number(query.page ?? "1") || 1, pageSize: 20 },
+    sort,
+    page: { page: parsePage(query.page), pageSize: 20 },
   });
 
   const flagsById: Record<string, RefundFlag[]> = {};
@@ -142,7 +145,7 @@ export function listRefundQueue(
   return {
     page,
     counts: statusCounts(buildQueueFilters(query, { includeStatus: false })),
-    sort: { key: sortKey, direction },
+    sort,
     flagsById,
   };
 }
@@ -162,7 +165,7 @@ export interface RefundDetail {
 }
 
 export function getRefundDetail(actor: Actor, refundId: string): RefundDetail {
-  requirePermission(actor, "refunds:view");
+  requirePermission(actor, REFUND_PERMISSIONS.view);
   const refund = findRefundById(refundId);
   if (!refund) throw new NotFoundError(`Refund ${refundId} not found`);
 

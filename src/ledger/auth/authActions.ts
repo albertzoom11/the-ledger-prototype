@@ -7,7 +7,7 @@ import { ANONYMOUS_ACTOR, recordAuditEvent } from "../audit/auditLog";
 import { safeNextPath } from "./redirects";
 import {
   SESSION_COOKIE,
-  actorForSessionToken,
+  userForSessionToken,
   pruneExpiredSessions,
   revokeSession,
   signInWithPassword,
@@ -87,15 +87,15 @@ export async function signIn(
   recordAuditEvent(
     {
       entityType: "session",
-      entityId: result.actor.id,
+      entityId: result.user.id,
       action: "auth.sign_in",
       metadata: {
-        email: result.actor.email,
-        role: result.actor.role,
+        email: result.user.email,
+        role: result.user.role,
         userAgent: userAgent ?? "",
       },
     },
-    result.actor,
+    result.user,
   );
 
   redirect(safeNextPath(next));
@@ -106,16 +106,16 @@ export async function signOut(): Promise<void> {
   const token = store.get(SESSION_COOKIE)?.value;
 
   if (token) {
-    const actor = actorForSessionToken(token);
-    if (actor) {
+    const user = userForSessionToken(token);
+    if (user) {
       recordAuditEvent(
         {
           entityType: "session",
-          entityId: actor.id,
+          entityId: user.id,
           action: "auth.sign_out",
-          metadata: { email: actor.email },
+          metadata: { email: user.email },
         },
-        actor,
+        user,
       );
     }
     revokeSession(token);

@@ -7,8 +7,8 @@ import {
   optionalString,
   selectOne,
 } from "../data/repository";
-import type { Actor } from "./actor";
 import type { Role } from "./roles";
+import type { UserRecord } from "./users";
 import { verifyPassword } from "./password";
 import { SESSION_TTL_HOURS } from "./sessionCookie";
 
@@ -28,7 +28,7 @@ const LOCKOUT_MINUTES = 15;
 const hashToken = (token: string) =>
   createHash("sha256").update(token).digest("hex");
 
-const mapActor = (row: Row): Actor => ({
+const mapUser = (row: Row): UserRecord => ({
   id: requireString(row, "id"),
   name: requireString(row, "name"),
   email: requireString(row, "email"),
@@ -41,7 +41,7 @@ export interface IssuedSession {
 }
 
 export type SignInResult =
-  | { ok: true; actor: Actor; session: IssuedSession }
+  | { ok: true; user: UserRecord; session: IssuedSession }
   | { ok: false; reason: "INVALID_CREDENTIALS" | "LOCKED"; retryAt?: string };
 
 interface CredentialRow extends Row {
@@ -70,7 +70,7 @@ export function signInWithPassword(
     "SELECT * FROM users WHERE lower(email) = lower(?)",
     [email.trim()],
     (raw) => ({
-      ...mapActor(raw),
+      ...mapUser(raw),
       password_hash: requireString(raw, "password_hash"),
       failed_attempts: requireNumber(raw, "failed_attempts"),
       locked_until: optionalString(raw, "locked_until"),
@@ -108,7 +108,7 @@ export function signInWithPassword(
 
   return {
     ok: true,
-    actor: { id: row.id, name: row.name, email: row.email, role: row.role as Role },
+    user: { id: row.id, name: row.name, email: row.email, role: row.role as Role },
     session: createSession(row.id, now),
   };
 }
@@ -138,19 +138,19 @@ export function createSession(
   return { token, expiresAt };
 }
 
-/** Resolves a session token to its actor, expiring stale sessions as it goes. */
-export function actorForSessionToken(
+/** Resolves a session token to its user, expiring stale sessions as it goes. */
+export function userForSessionToken(
   token: string,
   now: Date = new Date(),
-): Actor | null {
+): UserRecord | null {
   const tokenHash = hashToken(token);
-  const row = selectOne<{ actor: Actor; expiresAt: string }>(
+  const row = selectOne<{ user: UserRecord; expiresAt: string }>(
     `SELECT u.id, u.name, u.email, u.role, s.expires_at AS expires_at
        FROM sessions s
        JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ?`,
     [tokenHash],
-    (raw) => ({ actor: mapActor(raw), expiresAt: requireString(raw, "expires_at") }),
+    (raw) => ({ user: mapUser(raw), expiresAt: requireString(raw, "expires_at") }),
   );
   if (!row) return null;
 
@@ -163,7 +163,7 @@ export function actorForSessionToken(
     now.toISOString(),
     tokenHash,
   ]);
-  return row.actor;
+  return row.user;
 }
 
 export function revokeSession(token: string): void {

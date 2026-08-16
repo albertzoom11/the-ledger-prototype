@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
-import type { LedgerNavItem } from "./navigation";
+import type { NavGroup } from "../apps/registry";
 
 /**
  * Ledger platform: the sidebar. Groups arrive already filtered by the
@@ -11,13 +11,7 @@ import type { LedgerNavItem } from "./navigation";
  * so it stays correct across client-side navigations.
  */
 
-export interface SideNavGroup {
-  key: string;
-  name: string;
-  items: LedgerNavItem[];
-}
-
-export function SideNav({ groups }: { groups: SideNavGroup[] }) {
+export function SideNav({ groups }: { groups: NavGroup[] }) {
   const pathname = usePathname() ?? "";
 
   return (

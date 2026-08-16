@@ -48,7 +48,7 @@ requests are redirected to `/login?next=…` on the server.
   `httpOnly`, `sameSite=lax` cookie (`secure` in production) while only its SHA-256 hash
   is stored in the `sessions` table with a 12-hour expiry. The cookie carries no identity
   or role, so it cannot be edited into a privilege.
-- `getCurrentActor()` re-resolves the actor from the session on **every** server request;
+- `requireActor()` re-resolves the actor from the session on **every** server request;
   expired sessions are deleted on read, and sign-out revokes the row.
 - Five failed attempts lock an account for 15 minutes, and both successful and denied
   sign-ins are written to the same audit log as refund decisions (`auth.sign_in`,
@@ -90,26 +90,40 @@ business actions.
 
 ```
 src/
-  ledger/                     platform primitives — app-agnostic
-    auth/       roles + permissions, Actor, requirePermission(), password hashing,
-                server-side sessions, login form + sign-in/sign-out actions
+  ledger/                     the platform — app-agnostic, knows no domain nouns
+    apps/       LedgerApp manifest: nav + permissions + install(); nav/matrix derivation
+    auth/       roles, Actor, can()/requirePermission(), buildAccessPolicy(),
+                password hashing, server-side sessions, login form + auth actions
     action/     defineAction(): validate → authorize → run rules → audit
     audit/      append-only audit log + AuditTimeline
-    data/       db + schema, defineQuery/buildWhere (filter, sort, paginate)
-    shell/      AppShell, permission-filtered nav, app registry, sign-out
-    ui/         DataTable, Pagination, FilterBar, StatusBadge, ConfirmDialog,
-                Card/PageHeader/DescriptionList, form fields, Empty/Error/Skeleton,
+    data/       db handle, platform schema (users, sessions, audit_events),
+                applySchema(), defineQuery/buildWhere (filter, sort, paginate)
+    shell/      AppShell, permission-filtered SideNav, sign-out
+    ui/         DataTable, Pagination, FilterBar, StatusTabs, StatusBadge,
+                ConfirmDialog, Card/PageHeader/DescriptionList, form fields,
+                Empty/Error/Skeleton/Forbidden, listView.ts (URL contract),
                 money & date formatting
+    admin/      the platform's own app: audit log + access-control screens
+  platform/                   composition root — the only place apps are named
+    apps.ts     INSTALLED_APPS
+    access.ts   the access policy built from the installed apps + getActor()
+    bootstrap.ts installs each app's schema
   apps/
     refunds/                  the first application
+      app.ts      its manifest: nav, permissions + role grants, schema install
       domain/     status model, transitions, rules, risk signals (pure, tested)
-      data/       refund queries built on the ledger data primitives
+      data/       its own tables (schema.ts) + queries built on defineQuery
       service/    read + write use cases; server actions are a thin transport
-      ui/         table/filter *configuration* + decision panel
-  app/                        /login, plus the authenticated (app) group:
-                              /refunds, /refunds/[id], /admin/audit, /admin/access
+      ui/         its screens + table/filter *configuration* + decision panel
+  app/                        routes only — resolve the actor, render a screen:
+                              /login, plus the authenticated (app) group
+                              (/refunds, /refunds/[id], /admin/audit, /admin/access)
 scripts/seed.ts               deterministic synthetic dataset
 ```
+
+`src/ledger/README.md` is the module-by-module reference. The boundary is enforced,
+not just documented: ESLint forbids `src/ledger/**` from importing `@/apps/**` or
+`@/platform/**`, so platform code cannot quietly grow a dependency on an application.
 
 Three deliberate boundaries:
 
@@ -124,9 +138,38 @@ Three deliberate boundaries:
   column whitelist, so sort params can't inject SQL) and pagination once, for every list
   view in every future application.
 
-Adding a second internal tool (say Chargebacks) means: a domain file, a data file built
-on `defineQuery`, a service file of `defineAction`s, a column/filter config, a route, and
-one entry in `LEDGER_APPS`. No platform changes.
+### The reusable primitives
+
+These are the parts a second internal application would reuse as-is:
+
+| Primitive | Why it is platform, not refunds |
+| --- | --- |
+| `DataTable` + `Pagination` | Column definitions, sortable headers, row links, empty state. Columns are *data*; refunds supplies its own in `apps/refunds/ui/queueConfig.tsx`. |
+| `FilterBar` + `ui/listView.ts` | One query-string contract for every list view: read params, resolve `?sort=&dir=` against a whitelist, rebuild URLs. Shareable URLs, server-side filtering, no client state. |
+| `StatusTabs` / `StatusBadge` | Counted tabs and coloured pills. The *vocabulary* (`PENDING`, `ESCALATED`, …) belongs to the application, which passes descriptors in. |
+| `defineQuery` / `buildWhere` | Filtering, sorting against a column whitelist and pagination, once. |
+| `defineAction` | Validation, authorization and auditing for every mutation, structurally. |
+| Access policy (`auth/access.ts`) | Roles are platform; permission *strings* are declared by each app together with the roles that get them. `/admin/access` renders whatever is installed. |
+| `AppShell` + `SideNav` | Layout, identity/sign-out, and navigation filtered by the actor's permissions — derived from the installed manifests, so the shell names no application. |
+| Audit log + `AuditTimeline` | Entity-agnostic (`entityType`/`entityId`); the admin audit screen builds its filters from what the log contains. |
+| `Card`, `PageHeader`, `DescriptionList`, form fields, `Forbidden`, skeletons | The shared visual language, so two internal tools do not look like two products. |
+
+### Adding a second application
+
+Concretely, a Chargebacks tool would add `src/apps/chargebacks/` with:
+
+1. `app.ts` — a `LedgerApp` manifest: nav items, the permissions it defines and the
+   roles that receive them, and `install` pointing at its own `data/schema.ts`.
+2. `domain/` — its statuses and rules, pure and unit-tested.
+3. `data/` — its tables, plus queries built on `defineQuery`.
+4. `service/` — reads that `requirePermission`, writes wrapped in `defineAction`.
+5. `ui/` — column and filter configuration plus its screens, built from the UI kit.
+6. A thin route in the authenticated `src/app/(app)/` group that resolves the actor with
+   `requireActor()` and renders the screen.
+
+The only platform-side change is adding the manifest to `INSTALLED_APPS` in
+`src/platform/apps.ts`. Navigation, the permission matrix, audit coverage and schema
+installation all follow from the manifest — nothing in `src/ledger` is edited.
 
 ### Data model
 

@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentActor } from "@/ledger/auth/session";
 import type { ActionError } from "@/ledger/action/defineAction";
+import { getActor } from "@/platform/access";
 import type { RefundStatus } from "../domain/types";
 import { decideRefund } from "./refundDecisions";
 
@@ -25,7 +25,7 @@ export async function submitRefundDecision({
   note,
   expectedStatus,
 }: DecisionRequest): Promise<DecisionFormState> {
-  const actor = await getCurrentActor();
+  const actor = await getActor();
   if (!actor) {
     return {
       status: "error",

@@ -1,15 +1,20 @@
 import { AppShell } from "@/ledger/shell/AppShell";
-import { requireActor } from "@/ledger/auth/session";
 import { databaseIsSeeded } from "@/ledger/data/db";
 import { ErrorState } from "@/ledger/ui/primitives";
+import { requireActor } from "@/platform/access";
+import { INSTALLED_APPS } from "@/platform/apps";
+import { bootstrapLedger } from "@/platform/bootstrap";
 
 /**
  * Every authenticated surface renders inside this layout, so the session check
- * happens on the server before any application page runs.
+ * happens on the server before any application page runs, and the installed
+ * applications get to create their own tables before anything queries them.
  */
 export default async function AuthenticatedLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  bootstrapLedger();
+
   if (!databaseIsSeeded()) {
     return (
       <div className="mx-auto max-w-lg p-8">
@@ -23,5 +28,5 @@ export default async function AuthenticatedLayout({
 
   const actor = await requireActor();
 
-  return <AppShell actor={actor}>{children}</AppShell>;
+  return <AppShell actor={actor} apps={INSTALLED_APPS}>{children}</AppShell>;
 }

@@ -20,11 +20,17 @@ import type {
   RiskTier,
   Transaction,
 } from "../domain/types";
+import { ensureRefundsSchema } from "./schema";
 
 /**
  * Refunds data access. All reads/writes for the application live here and are
  * built out of the Ledger data primitives (defineQuery, buildWhere, ...).
+ *
+ * The application's own tables are installed on first use, so a server action
+ * that runs before any page render still finds them.
  */
+
+ensureRefundsSchema();
 
 const REFUND_FROM = `
   FROM refunds r

@@ -1,15 +1,21 @@
-import { Role, Permission, roleHasPermission } from "./roles";
+import type { Permission } from "./access";
+import type { Role } from "./roles";
 
 /**
  * An Actor is whoever is performing an action. In production this comes from
  * the identity provider; here it comes from a server-side session. Everything
  * downstream (services, audit log) only depends on this shape.
+ *
+ * The actor's permissions are resolved once, from the access policy, when the
+ * session is resolved — so authorization checks are pure list membership and
+ * business logic never has to reach for a global role table.
  */
 export interface Actor {
   id: string;
   name: string;
   email: string;
   role: Role;
+  permissions: readonly Permission[];
 }
 
 export class ForbiddenError extends Error {
@@ -26,7 +32,7 @@ export class ForbiddenError extends Error {
 }
 
 export function can(actor: Actor, permission: Permission): boolean {
-  return roleHasPermission(actor.role, permission);
+  return actor.permissions.includes(permission);
 }
 
 /** Server-side authorization gate. Business actions call this, never the UI. */
