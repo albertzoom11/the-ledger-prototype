@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Actor } from "./actor";
-import { SESSION_COOKIE, actorForSessionToken } from "./sessionStore";
+import { SESSION_COOKIE } from "./sessionCookie";
+import { actorForSessionToken } from "./sessionStore";
 
 /**
  * Ledger platform: request identity.

@@ -10,6 +10,7 @@ import {
 import type { Actor } from "./actor";
 import type { Role } from "./roles";
 import { verifyPassword } from "./password";
+import { SESSION_TTL_HOURS } from "./sessionCookie";
 
 /**
  * Ledger platform: server-side sessions.
@@ -19,8 +20,7 @@ import { verifyPassword } from "./password";
  * and a stolen cookie cannot be turned back into a password.
  */
 
-export const SESSION_COOKIE = "ledger_session";
-export const SESSION_TTL_HOURS = 12;
+export { SESSION_COOKIE, SESSION_TTL_HOURS } from "./sessionCookie";
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
