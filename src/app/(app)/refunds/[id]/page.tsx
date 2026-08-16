@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import clsx from "clsx";
 import { NotFoundError } from "@/ledger/action/defineAction";
-import { getCurrentActor } from "@/ledger/auth/session";
+import { requireActor } from "@/ledger/auth/session";
 import { AuditTimeline } from "@/ledger/audit/AuditTimeline";
 import { StatusBadge } from "@/ledger/ui/StatusBadge";
 import {
@@ -27,7 +27,7 @@ export default async function RefundDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const actor = await getCurrentActor();
+  const actor = await requireActor(`/refunds/${id}`);
 
   let detail;
   try {
@@ -145,6 +145,7 @@ export default async function RefundDetailPage({
               currency={refund.currency}
               terminal={isTerminal(refund.status)}
               options={availableDecisions}
+              expectedStatus={refund.status}
             />
           </Card>
 

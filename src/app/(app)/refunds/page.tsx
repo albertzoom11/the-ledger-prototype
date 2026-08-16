@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import clsx from "clsx";
-import { getCurrentActor } from "@/ledger/auth/session";
+import { requireActor } from "@/ledger/auth/session";
 import { DataTable, Pagination } from "@/ledger/ui/DataTable";
 import { FilterBar } from "@/ledger/ui/FilterBar";
 import { Card, PageHeader, TableSkeleton } from "@/ledger/ui/primitives";
@@ -77,7 +77,7 @@ export default async function RefundQueuePage({
 }
 
 async function RefundQueue({ query }: { query: RefundQueueQuery }) {
-  const actor = await getCurrentActor();
+  const actor = await requireActor("/refunds");
   const { page, counts, sort, flagsById } = listRefundQueue(actor, query);
   const openValue = page.items
     .filter((refund) => refund.status === "PENDING" || refund.status === "ESCALATED")

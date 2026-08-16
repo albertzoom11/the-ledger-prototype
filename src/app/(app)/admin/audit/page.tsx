@@ -1,5 +1,5 @@
-import { forbidden403 } from "@/app/admin/forbidden";
-import { getCurrentActor } from "@/ledger/auth/session";
+import { forbidden403 } from "../forbidden";
+import { requireActor } from "@/ledger/auth/session";
 import { can } from "@/ledger/auth/actor";
 import { queryAuditEvents } from "@/ledger/audit/auditLog";
 import { AuditTimeline } from "@/ledger/audit/AuditTimeline";
@@ -15,7 +15,7 @@ export default async function AuditLogPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const actor = await getCurrentActor();
+  const actor = await requireActor("/admin/audit");
   if (!can(actor, "audit:view")) {
     return forbidden403("audit:view", actor.role);
   }

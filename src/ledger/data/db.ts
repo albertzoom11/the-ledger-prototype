@@ -31,8 +31,26 @@ export function migrate(db: Database.Database): void {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       email TEXT NOT NULL,
-      role TEXT NOT NULL
+      role TEXT NOT NULL,
+      password_hash TEXT NOT NULL DEFAULT '',
+      failed_attempts INTEGER NOT NULL DEFAULT 0,
+      locked_until TEXT
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(lower(email));
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      token_hash TEXT NOT NULL UNIQUE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      user_agent TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 
     CREATE TABLE IF NOT EXISTS customers (
       id TEXT PRIMARY KEY,
@@ -83,6 +101,31 @@ export function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_events(entity_type, entity_id);
     CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_events(timestamp);
   `);
+
+  addMissingColumns(db, "users", {
+    password_hash: "TEXT NOT NULL DEFAULT ''",
+    failed_attempts: "INTEGER NOT NULL DEFAULT 0",
+    locked_until: "TEXT",
+  });
+}
+
+/** Brings a database created by an earlier schema version up to date. */
+function addMissingColumns(
+  db: Database.Database,
+  table: string,
+  columns: Record<string, string>,
+): void {
+  const existing = new Set(
+    db
+      .prepare<[], { name: string }>(`PRAGMA table_info(${table})`)
+      .all()
+      .map((row) => row.name),
+  );
+  for (const [name, definition] of Object.entries(columns)) {
+    if (!existing.has(name)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${name} ${definition}`);
+    }
+  }
 }
 
 export function databaseIsSeeded(): boolean {

@@ -1,28 +1,35 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+import { redirect } from "next/navigation";
 import type { Actor } from "./actor";
-import { findUser, listUsers } from "./users";
+import { safeNextPath } from "./redirects";
+import { REQUESTED_PATH_HEADER, SESSION_COOKIE } from "./sessionCookie";
+import { actorForSessionToken } from "./sessionStore";
 
 /**
- * Prototype identity: the "signed-in" actor is stored in a cookie and resolved
- * on the server on every request. Replacing this file with an OIDC/SSO session
- * lookup is the only change needed to make identity real — no service or UI
- * code reads the cookie directly.
+ * Ledger platform: request identity.
+ *
+ * The signed-in actor is resolved from a server-side session on every request;
+ * the cookie itself carries no identity or role, only an opaque token. Service
+ * and UI code never reads the cookie — they take the Actor from here.
  */
 
-export const ACTOR_COOKIE = "ledger_actor";
+export async function getCurrentActor(): Promise<Actor | null> {
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  return actorForSessionToken(token);
+}
 
-export async function getCurrentActor(): Promise<Actor> {
-  const store = await cookies();
-  const id = store.get(ACTOR_COOKIE)?.value;
-  const actor = id ? findUser(id) : null;
+/**
+ * Server-side gate for any authenticated surface. A caller can name the page to
+ * come back to; otherwise the requested path recorded by middleware is used, so
+ * an expired or forged session keeps its deep link instead of landing on a bare
+ * login page. Either way the target goes through `safeNextPath()`, since the
+ * header is ultimately client-supplied.
+ */
+export async function requireActor(returnTo?: string): Promise<Actor> {
+  const actor = await getCurrentActor();
   if (actor) return actor;
 
-  const fallback =
-    listUsers().find((user) => user.role === "REVIEWER") ?? listUsers()[0];
-  if (!fallback) {
-    throw new Error(
-      "No users found. Run `npm run seed` to populate the Ledger database.",
-    );
-  }
-  return fallback;
+  const requested = returnTo ?? (await headers()).get(REQUESTED_PATH_HEADER);
+  redirect(`/login?next=${encodeURIComponent(safeNextPath(requested))}`);
 }

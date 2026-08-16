@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import type { Actor } from "../auth/actor";
 import type { Role } from "../auth/roles";
 import {
   Filter,
@@ -18,13 +17,18 @@ import {
 
 export type AuditOutcome = "SUCCESS" | "DENIED" | "REJECTED_BY_RULE";
 
+/** Sign-in attempts are audited before an identity exists, hence ANONYMOUS. */
+export type AuditActorRole = Role | "ANONYMOUS";
+
+export const ANONYMOUS_ACTOR = { id: "anonymous", role: "ANONYMOUS" } as const;
+
 export interface AuditEvent {
   id: string;
   entityType: string;
   entityId: string;
   action: string;
   actorId: string;
-  actorRole: Role;
+  actorRole: AuditActorRole;
   outcome: AuditOutcome;
   timestamp: string;
   metadata: Record<string, unknown>;
@@ -47,7 +51,7 @@ function mapAuditEvent(row: Row): AuditEvent {
     entityId: requireString(row, "entity_id"),
     action: requireString(row, "action"),
     actorId: requireString(row, "actor_id"),
-    actorRole: requireString(row, "actor_role") as Role,
+    actorRole: requireString(row, "actor_role") as AuditActorRole,
     outcome: requireString(row, "outcome") as AuditOutcome,
     timestamp: requireString(row, "timestamp"),
     metadata:
@@ -59,7 +63,7 @@ function mapAuditEvent(row: Row): AuditEvent {
 
 export function recordAuditEvent(
   draft: AuditDraft,
-  actor: Pick<Actor, "id" | "role">,
+  actor: { id: string; role: AuditActorRole },
   timestamp: string = new Date().toISOString(),
 ): AuditEvent {
   const event: AuditEvent = {
