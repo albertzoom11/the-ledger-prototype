@@ -29,6 +29,20 @@ function SuccessBanner({ message }: { message: string }) {
   );
 }
 
+/**
+ * True when the only thing standing between this decision and the server is a
+ * note the reviewer has not written yet — the case we deliberately let through
+ * so the rejection comes from the business layer.
+ */
+function onlyMissingNote(option: DecisionOption, note: string): boolean {
+  return (
+    !option.allowed &&
+    option.noteRequired &&
+    note.trim().length < MIN_NOTE_LENGTH &&
+    Boolean(option.reason?.includes("note"))
+  );
+}
+
 const LABEL: Record<Decision, string> = {
   APPROVE: "Approve refund",
   REJECT: "Reject refund",
@@ -58,6 +72,7 @@ export function DecisionPanel({
   const [note, setNote] = useState("");
   const [pendingDecision, setPendingDecision] = useState<Decision | null>(null);
   const [error, setError] = useState<string | undefined>();
+  const [errorCode, setErrorCode] = useState<string | undefined>();
   const [success, setSuccess] = useState<string | undefined>();
   const [isPending, startTransition] = useTransition();
 
@@ -81,6 +96,7 @@ export function DecisionPanel({
 
   function submit(decision: Decision) {
     setError(undefined);
+    setErrorCode(undefined);
     setSuccess(undefined);
     startTransition(async () => {
       const result = await submitRefundDecision({
@@ -92,6 +108,7 @@ export function DecisionPanel({
       setPendingDecision(null);
       if (result.status === "error") {
         setError(result.message);
+        setErrorCode(result.error?.code);
       } else {
         setSuccess(result.message);
         setNote("");
@@ -116,6 +133,18 @@ export function DecisionPanel({
         />
       </Field>
 
+      {errorCode && (
+        <p className="text-[12px] text-red-700">
+          Rejected by the server before anything was written — {errorCode}, recorded
+          in the audit log.
+        </p>
+      )}
+
+      {success && (
+        <p className="text-[12px] text-muted">
+          Validated, authorized, persisted and audited on the server.
+        </p>
+      )}
       {success && <SuccessBanner message={success} />}
       {isPending && (
         <p className="text-[12px] text-muted" role="status">
@@ -126,15 +155,19 @@ export function DecisionPanel({
       <div className="flex flex-wrap items-center gap-2">
         {(["APPROVE", "REJECT", "ESCALATE"] as const).map((decision) => {
           const option = optionFor(decision);
-          const noteTooShort =
-            Boolean(option?.noteRequired) &&
-            note.trim().length < MIN_NOTE_LENGTH;
-          const disabled = !option?.allowed || noteTooShort || isPending;
-          const unavailableReason = option?.allowed
-            ? noteTooShort
-              ? `Requires a note of at least ${MIN_NOTE_LENGTH} characters`
-              : undefined
-            : option?.reason;
+          /**
+           * A missing note is left to the server: the reviewer submits, the
+           * action layer rejects it and the attempt is audited. Only decisions
+           * the actor's role or the refund's status rule out are disabled here.
+           */
+          const blockedOnNote = option ? onlyMissingNote(option, note) : false;
+          const unavailable = !option?.allowed && !blockedOnNote;
+          const disabled = unavailable || isPending;
+          const unavailableReason = unavailable
+            ? option?.reason
+            : blockedOnNote
+              ? `The server requires a note of at least ${MIN_NOTE_LENGTH} characters`
+              : undefined;
           return (
             <Button
               key={decision}
@@ -159,7 +192,9 @@ export function DecisionPanel({
       </div>
 
       {options
-        .filter((option) => !option.allowed && option.reason)
+        .filter(
+          (option) => !option.allowed && option.reason && !onlyMissingNote(option, note),
+        )
         .map((option) => (
           <FormError
             key={option.decision}
