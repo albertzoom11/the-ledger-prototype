@@ -8,6 +8,7 @@ import {
   execute,
   optionalString,
   requireString,
+  selectAll,
 } from "../data/repository";
 
 /**
@@ -119,6 +120,15 @@ export const queryAuditEvents = defineQuery<
     actorName: optionalString(row, "actor_name") ?? requireString(row, "actor_id"),
   }),
 });
+
+/** Entity types the log has actually seen — the audit view stays app-agnostic. */
+export function listAuditEntityTypes(): string[] {
+  return selectAll(
+    "SELECT DISTINCT entity_type FROM audit_events ORDER BY entity_type",
+    [],
+    (row) => requireString(row, "entity_type"),
+  );
+}
 
 export function auditTrailFor(
   entityType: string,

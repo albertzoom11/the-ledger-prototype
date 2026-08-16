@@ -4,6 +4,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { getDb } from "../src/ledger/data/db";
+import { bootstrapLedger } from "../src/platform/bootstrap";
 import { recordAuditEvent } from "../src/ledger/audit/auditLog";
 import {
   PAYMENT_METHODS,
@@ -102,6 +103,8 @@ const USERS = [
 ] as const;
 
 function seed(): void {
+  // Installs each application's tables on top of the platform schema.
+  bootstrapLedger();
   const db = getDb();
   const force = process.argv.includes("--force");
   const existing = db

@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import type { Actor } from "../auth/actor";
+import type { UserRecord } from "../auth/users";
 import { ROLE_LABELS } from "../auth/roles";
 import { switchActor } from "./actions";
 
@@ -14,7 +15,7 @@ export function ActorSwitcher({
   actors,
 }: {
   actor: Actor;
-  actors: Actor[];
+  actors: UserRecord[];
 }) {
   const [isPending, startTransition] = useTransition();
 

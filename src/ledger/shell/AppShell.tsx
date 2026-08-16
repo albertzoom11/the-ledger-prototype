@@ -1,32 +1,30 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { can, type Actor } from "../auth/actor";
+import type { Actor } from "../auth/actor";
 import { ROLE_LABELS } from "../auth/roles";
-import { LEDGER_APPS } from "./navigation";
+import type { UserRecord } from "../auth/users";
+import { navGroupsFor, type LedgerApp } from "../apps/registry";
 import { ActorSwitcher } from "./ActorSwitcher";
-import { SideNav, type SideNavGroup } from "./SideNav";
+import { SideNav } from "./SideNav";
 
 /**
  * Ledger platform: the shell every internal application renders inside.
- * Navigation is filtered by the server-resolved actor's permissions.
+ * Navigation comes from the installed app manifests and is filtered by the
+ * server-resolved actor's permissions — the shell knows no application by name.
  */
 
 export function AppShell({
   actor,
   actors,
+  apps,
   children,
 }: {
   actor: Actor;
-  actors: Actor[];
+  actors: UserRecord[];
+  apps: readonly LedgerApp[];
   children: ReactNode;
 }) {
-  const groups: SideNavGroup[] = LEDGER_APPS.map((app) => ({
-    key: app.key,
-    name: app.name,
-    items: app.items.filter(
-      (item) => !item.permission || can(actor, item.permission),
-    ),
-  })).filter((group) => group.items.length > 0);
+  const groups = navGroupsFor(apps, actor);
 
   return (
     <div className="flex min-h-screen flex-col">

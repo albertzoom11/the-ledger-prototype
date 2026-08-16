@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppShell } from "@/ledger/shell/AppShell";
-import { getCurrentActor } from "@/ledger/auth/session";
 import { listUsers } from "@/ledger/auth/users";
 import { databaseIsSeeded } from "@/ledger/data/db";
+import { getActor } from "@/platform/access";
+import { INSTALLED_APPS } from "@/platform/apps";
+import { bootstrapLedger } from "@/platform/bootstrap";
 import { ErrorState } from "@/ledger/ui/primitives";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -18,6 +20,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  bootstrapLedger();
   const seeded = databaseIsSeeded();
 
   if (!seeded) {
@@ -35,12 +38,12 @@ export default async function RootLayout({
     );
   }
 
-  const [actor, actors] = [await getCurrentActor(), listUsers()];
+  const [actor, actors] = [await getActor(), listUsers()];
 
   return (
     <html lang="en" className={inter.variable}>
       <body>
-        <AppShell actor={actor} actors={actors}>
+        <AppShell actor={actor} actors={actors} apps={INSTALLED_APPS}>
           {children}
         </AppShell>
       </body>

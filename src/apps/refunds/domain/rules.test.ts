@@ -8,12 +8,18 @@ const reviewer: Actor = {
   name: "Priya Raman",
   email: "priya@ledger.dev",
   role: "REVIEWER",
+  permissions: ["refunds:view", "refunds:decide"],
 };
 const admin: Actor = {
   id: "usr_admin_1",
   name: "Sam Ortega",
   email: "sam@ledger.dev",
   role: "ADMIN",
+  permissions: [
+    "refunds:view",
+    "refunds:decide",
+    "refunds:decide_high_value",
+  ],
 };
 
 const NOTE = "x".repeat(MIN_NOTE_LENGTH);

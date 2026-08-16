@@ -38,10 +38,6 @@ export function formatRelative(iso: string, now: Date = new Date()): string {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-export function ageInHours(iso: string, now: Date = new Date()): number {
-  return Math.floor((now.getTime() - new Date(iso).getTime()) / 3_600_000);
-}
-
 export function titleCase(value: string): string {
   return value
     .toLowerCase()

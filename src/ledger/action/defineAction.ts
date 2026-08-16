@@ -1,6 +1,6 @@
 import { ZodType, type ZodTypeDef } from "zod";
 import { Actor, ForbiddenError, requirePermission } from "../auth/actor";
-import type { Permission } from "../auth/roles";
+import type { Permission } from "../auth/access";
 import { AuditDraft, recordAuditEvent } from "../audit/auditLog";
 
 /**
