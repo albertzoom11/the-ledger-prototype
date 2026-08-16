@@ -1,9 +1,9 @@
 import { Fragment } from "react";
 import type { AccessPolicy } from "../auth/access";
+import { getAccessOverview } from "../auth/accessService";
 import type { Actor } from "../auth/actor";
-import { can } from "../auth/actor";
+import { ForbiddenError } from "../auth/actor";
 import { ROLES, ROLE_LABELS } from "../auth/roles";
-import { listUsers } from "../auth/users";
 import { Forbidden } from "../ui/Forbidden";
 import { Card, PageHeader } from "../ui/primitives";
 
@@ -19,11 +19,17 @@ export function AccessControlScreen({
   actor: Actor;
   policy: AccessPolicy;
 }) {
-  if (!can(actor, "admin:access")) {
-    return <Forbidden permission="admin:access" role={actor.role} />;
+  // The service is the enforcement point; the screen only renders the denial.
+  let overview;
+  try {
+    overview = getAccessOverview(actor, policy);
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return <Forbidden permission={error.permission} role={actor.role} />;
+    }
+    throw error;
   }
-
-  const users = listUsers();
+  const { users, groups } = overview;
 
   return (
     <div className="flex flex-col gap-4">
@@ -52,7 +58,7 @@ export function AccessControlScreen({
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
-              {policy.groups.map((group) => (
+              {groups.map((group) => (
                 <Fragment key={group.key}>
                   <tr className="bg-canvas">
                     <td

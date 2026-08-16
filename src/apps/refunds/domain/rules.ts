@@ -1,3 +1,4 @@
+import type { Permission } from "@/ledger/auth/access";
 import type { Actor } from "@/ledger/auth/actor";
 import { can } from "@/ledger/auth/actor";
 import { ageInHours } from "@/ledger/time";
@@ -124,6 +125,26 @@ export interface DecisionCheck {
 }
 
 /**
+ * The permissions a decision needs, derived from the refund itself. The service
+ * layer resolves this against the *stored* refund and hands it to
+ * `defineAction`, so the amount that decides whether admin approval is needed
+ * can never come from the request payload.
+ *
+ * Declared here rather than imported from the app manifest to keep this module
+ * free of server-only imports.
+ */
+export function permissionsForDecision(
+  refund: RefundListItem,
+  decision: RefundDecision,
+): Permission[] {
+  const permissions: Permission[] = ["refunds:decide"];
+  if (decision === "APPROVE" && isHighValue(refund)) {
+    permissions.push("refunds:decide_high_value");
+  }
+  return permissions;
+}
+
+/**
  * The single source of truth for "can this actor make this decision now?".
  * `assertDecisionAllowed` is what the service layer enforces.
  */
@@ -149,23 +170,15 @@ export function checkDecision(
       reason: `${decision.toLowerCase()} is not a valid transition from ${refund.status.toLowerCase()}.`,
     };
   }
-  if (!can(actor, "refunds:decide")) {
-    return {
-      allowed: false,
-      noteRequired,
-      reason: "Your role cannot process refunds.",
-    };
-  }
-  if (
-    decision === "APPROVE" &&
-    isHighValue(refund) &&
-    !can(actor, "refunds:decide_high_value")
-  ) {
+  for (const permission of permissionsForDecision(refund, decision)) {
+    if (can(actor, permission)) continue;
     return {
       allowed: false,
       noteRequired,
       reason:
-        "Refunds of $500.00 or more must be approved by an Admin. Escalate this request instead.",
+        permission === "refunds:decide_high_value"
+          ? "Refunds of $500.00 or more must be approved by an Admin. Escalate this request instead."
+          : "Your role cannot process refunds.",
     };
   }
   if (

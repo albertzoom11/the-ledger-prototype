@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "seed": "tsx scripts/seed.ts",
+    "authz:check": "tsx scripts/authz-check.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

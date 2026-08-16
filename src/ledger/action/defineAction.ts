@@ -9,7 +9,8 @@ import { AuditDraft, recordAuditEvent } from "../audit/auditLog";
  *
  * Every action gets, in this order:
  *   1. schema validation of untrusted input,
- *   2. server-side permission enforcement,
+ *   2. server-side permission enforcement — the static permission plus any
+ *      entity-dependent permissions resolved from the loaded record,
  *   3. domain rule execution,
  *   4. an audit event — including for denied and rule-rejected attempts.
  *
@@ -61,6 +62,14 @@ export interface ActionContext {
 export interface ActionDefinition<TInput, TOutput> {
   name: string;
   permission: Permission;
+  /**
+   * Extra permissions required for this particular input, resolved server-side
+   * after validation (e.g. approving a high-value refund needs
+   * `refunds:decide_high_value`). Keeping this in the wrapper means an
+   * entity-dependent rule is still an audited authorization decision rather
+   * than something a call site may forget.
+   */
+  additionalPermissions?: (input: TInput, context: ActionContext) => readonly Permission[];
   /** Third parameter is `unknown`: input arrives untrusted from the client. */
   input: ZodType<TInput, ZodTypeDef, unknown>;
   handler: (input: TInput, context: ActionContext) => TOutput;
@@ -95,13 +104,20 @@ export function defineAction<TInput, TOutput>(
 
     try {
       requirePermission(context.actor, definition.permission);
+      for (const permission of definition.additionalPermissions?.(input, context) ??
+        []) {
+        requirePermission(context.actor, permission);
+      }
     } catch (error) {
       if (error instanceof ForbiddenError) {
         audit(definition, { input, output: null, context }, "DENIED", {
           reason: error.message,
-          requiredPermission: definition.permission,
+          requiredPermission: error.permission,
         });
         return { ok: false, error: { code: "FORBIDDEN", message: error.message } };
+      }
+      if (error instanceof NotFoundError) {
+        return { ok: false, error: { code: "NOT_FOUND", message: error.message } };
       }
       throw error;
     }

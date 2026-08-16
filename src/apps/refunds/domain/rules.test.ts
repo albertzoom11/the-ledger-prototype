@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Actor } from "@/ledger/auth/actor";
-import { checkDecision, refundFlags, MIN_NOTE_LENGTH } from "./rules";
+import {
+  checkDecision,
+  permissionsForDecision,
+  refundFlags,
+  MIN_NOTE_LENGTH,
+} from "./rules";
 import type { RefundListItem } from "./types";
 
 const reviewer: Actor = {
@@ -98,6 +103,20 @@ describe("refund decision rules", () => {
     const escalated = refund({ status: "ESCALATED" });
     expect(checkDecision(escalated, "ESCALATE", reviewer, NOTE).allowed).toBe(false);
     expect(checkDecision(escalated, "APPROVE", admin, NOTE).allowed).toBe(true);
+  });
+});
+
+describe("permissions required for a decision", () => {
+  it("adds the admin permission only for approving a high-value refund", () => {
+    const highValue = refund({ requestedAmountCents: 75_000 });
+
+    expect(permissionsForDecision(refund(), "APPROVE")).toEqual(["refunds:decide"]);
+    expect(permissionsForDecision(highValue, "APPROVE")).toEqual([
+      "refunds:decide",
+      "refunds:decide_high_value",
+    ]);
+    expect(permissionsForDecision(highValue, "REJECT")).toEqual(["refunds:decide"]);
+    expect(permissionsForDecision(highValue, "ESCALATE")).toEqual(["refunds:decide"]);
   });
 });
 

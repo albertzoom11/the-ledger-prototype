@@ -5,6 +5,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    /** Integration tests share one throwaway SQLite file, so they run serially. */
+    fileParallelism: false,
     /** Integration tests run against a throwaway SQLite file, never data/ledger.db. */
     env: {
       LEDGER_DB_PATH: path.resolve(__dirname, "data", "test.ledger.db"),
