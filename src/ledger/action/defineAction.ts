@@ -37,6 +37,7 @@ export class NotFoundError extends Error {
 }
 
 export type ActionErrorCode =
+  | "UNAUTHENTICATED"
   | "VALIDATION"
   | "FORBIDDEN"
   | "RULE_VIOLATION"

@@ -37,9 +37,40 @@ Business rules enforced in the service layer (not the UI):
 | Terminal states | `APPROVED` / `REJECTED` are immutable. |
 | Valid transitions | `PENDING → APPROVED / REJECTED / ESCALATED`, `ESCALATED → APPROVED / REJECTED`. |
 
+## Sign-in and sessions
+
+Every route under the authenticated layout requires a real sign-in; unauthenticated
+requests are redirected to `/login?next=…` on the server.
+
+- Passwords are **scrypt-hashed with a per-user salt** (`ledger/auth/password.ts`) and
+  compared in constant time. Plaintext is never stored or logged.
+- Sign-in issues a **server-side session**: a 32-byte random token goes into an
+  `httpOnly`, `sameSite=lax` cookie (`secure` in production) while only its SHA-256 hash
+  is stored in the `sessions` table with a 12-hour expiry. The cookie carries no identity
+  or role, so it cannot be edited into a privilege.
+- `requireActor()` re-resolves the actor from the session on **every** server request;
+  expired sessions are deleted on read, and sign-out revokes the row.
+- Five failed attempts lock an account for 15 minutes, and both successful and denied
+  sign-ins are written to the same audit log as refund decisions (`auth.sign_in`,
+  `auth.sign_out`).
+
+Seeded demo accounts (synthetic, prototype-only — password printed by `npm run seed` and
+overridable with `LEDGER_DEMO_PASSWORD`):
+
+| Account | Role | Password |
+| --- | --- | --- |
+| `priya.raman@ledger.dev` | Reviewer | `ledger-demo` |
+| `dev.okonkwo@ledger.dev` | Reviewer | `ledger-demo` |
+| `sam.ortega@ledger.dev` | Admin | `ledger-demo` |
+
+Prototype limits, stated plainly: local password auth with shared demo credentials, no
+MFA, no password rotation/reset, no CSRF token beyond `sameSite` cookies, and no identity
+provider. It is a real authentication *path* (hashing, server-side sessions, expiry,
+revocation, audited attempts), not a production IdP.
+
 ### Role-aware behaviour (how to see it in 30 seconds)
 
-Use the **Signed in as** switcher in the header.
+Sign in as each demo account.
 
 - As **Priya Raman (Reviewer)**: open a refund with the "High value" signal — *Approve*
   is disabled with the reason shown, *Escalate* works, and `/admin/audit` returns a
@@ -47,8 +78,9 @@ Use the **Signed in as** switcher in the header.
 - As **Sam Ortega (Admin)**: the same refund can be approved, and the Platform section
   of the sidebar appears (audit log + permission matrix).
 
-The switcher only sets a cookie. The server re-resolves the actor and re-checks
-permissions on every read and every mutation, so nothing here is UI-only authorization.
+Authentication and authorization stay separate: the session answers *who* the actor is,
+and `requirePermission` answers *what* they may do on every read and every mutation, so
+nothing here is UI-only authorization.
 
 ## Architecture
 
@@ -60,12 +92,13 @@ business actions.
 src/
   ledger/                     the platform — app-agnostic, knows no domain nouns
     apps/       LedgerApp manifest: nav + permissions + install(); nav/matrix derivation
-    auth/       roles, Actor, can()/requirePermission(), buildAccessPolicy()
+    auth/       roles, Actor, can()/requirePermission(), buildAccessPolicy(),
+                password hashing, server-side sessions, login form + auth actions
     action/     defineAction(): validate → authorize → run rules → audit
     audit/      append-only audit log + AuditTimeline
-    data/       db handle, platform schema (users, audit_events), applySchema(),
-                defineQuery/buildWhere (filter, sort, paginate)
-    shell/      AppShell, permission-filtered SideNav, identity switcher
+    data/       db handle, platform schema (users, sessions, audit_events),
+                applySchema(), defineQuery/buildWhere (filter, sort, paginate)
+    shell/      AppShell, permission-filtered SideNav, sign-out
     ui/         DataTable, Pagination, FilterBar, StatusTabs, StatusBadge,
                 ConfirmDialog, Card/PageHeader/DescriptionList, form fields,
                 Empty/Error/Skeleton/Forbidden, listView.ts (URL contract),
@@ -82,7 +115,9 @@ src/
       data/       its own tables (schema.ts) + queries built on defineQuery
       service/    read + write use cases; server actions are a thin transport
       ui/         its screens + table/filter *configuration* + decision panel
-  app/                        routes only: resolve the actor, render a screen
+  app/                        routes only — resolve the actor, render a screen:
+                              /login, plus the authenticated (app) group
+                              (/refunds, /refunds/[id], /admin/audit, /admin/access)
 scripts/seed.ts               deterministic synthetic dataset
 ```
 
@@ -115,7 +150,7 @@ These are the parts a second internal application would reuse as-is:
 | `defineQuery` / `buildWhere` | Filtering, sorting against a column whitelist and pagination, once. |
 | `defineAction` | Validation, authorization and auditing for every mutation, structurally. |
 | Access policy (`auth/access.ts`) | Roles are platform; permission *strings* are declared by each app together with the roles that get them. `/admin/access` renders whatever is installed. |
-| `AppShell` + `SideNav` | Layout, identity switcher, and navigation filtered by the actor's permissions. |
+| `AppShell` + `SideNav` | Layout, identity/sign-out, and navigation filtered by the actor's permissions — derived from the installed manifests, so the shell names no application. |
 | Audit log + `AuditTimeline` | Entity-agnostic (`entityType`/`entityId`); the admin audit screen builds its filters from what the log contains. |
 | `Card`, `PageHeader`, `DescriptionList`, form fields, `Forbidden`, skeletons | The shared visual language, so two internal tools do not look like two products. |
 
@@ -129,7 +164,8 @@ Concretely, a Chargebacks tool would add `src/apps/chargebacks/` with:
 3. `data/` — its tables, plus queries built on `defineQuery`.
 4. `service/` — reads that `requirePermission`, writes wrapped in `defineAction`.
 5. `ui/` — column and filter configuration plus its screens, built from the UI kit.
-6. A thin route under `src/app/` that resolves the actor and renders the screen.
+6. A thin route in the authenticated `src/app/(app)/` group that resolves the actor with
+   `requireActor()` and renders the screen.
 
 The only platform-side change is adding the manifest to `INSTALLED_APPS` in
 `src/platform/apps.ts`. Navigation, the permission matrix, audit coverage and schema
@@ -138,7 +174,8 @@ installation all follow from the manifest — nothing in `src/ledger` is edited.
 ### Data model
 
 `Customer → Transaction → Refund`, plus `AuditEvent` (polymorphic on
-`entityType`/`entityId`) and `User` (id, name, email, role). Money is stored in integer
+`entityType`/`entityId`), `User` (id, name, email, role, scrypt password hash, lockout
+counters) and `Session` (token hash, user, expiry). Money is stored in integer
 minor units. The seed is deterministic: 48 customers, 180 transactions, 102 refunds
 across all four statuses, ~170 audit events, including partial refunds, over-refunds,
 high-value requests and one denied approval attempt so the audit log shows enforcement.
@@ -148,7 +185,7 @@ high-value requests and one denied approval attempt so the audit log shows enfor
 ```bash
 npm install
 npm run seed        # deterministic synthetic data into data/ledger.db
-npm run dev         # http://localhost:3000  → redirects to /refunds
+npm run dev         # http://localhost:3000 → /login, then /refunds
 ```
 
 ```bash
@@ -163,12 +200,12 @@ npm run seed -- --force   # rebuild the dataset
 
 ## What would be built next in a production implementation
 
-1. **Real identity**: replace `ledger/auth/session.ts` with OIDC/SSO + short-lived
-   sessions, group-derived roles, and step-up auth for high-value approvals. The
-   `Actor` shape and every permission check stay as they are.
+1. **Real identity**: swap `ledger/auth/sessionStore.ts` for OIDC/SSO with group-derived
+   roles, MFA and step-up auth for high-value approvals, plus session listing/revocation
+   and rate limiting per IP. The `Actor` shape and every permission check stay as they are.
 2. **Real persistence**: Postgres with migrations behind the same repository/`defineQuery`
-   surface, plus optimistic concurrency on decisions (the `expectedStatus` field is
-   already accepted) so two reviewers can't race a transition.
+   surface. Decisions already use optimistic concurrency (`expectedStatus` plus a
+   status-guarded `UPDATE`), so two reviewers cannot race a transition.
 3. **Payments integration**: an idempotent refund-execution port to the processor, with
    outbox + retry, and a `SETTLING`/`FAILED` extension to the status model so the UI
    distinguishes "approved" from "money moved".

@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 import { getDb } from "../src/ledger/data/db";
 import { bootstrapLedger } from "../src/platform/bootstrap";
 import { recordAuditEvent } from "../src/ledger/audit/auditLog";
+import { hashPassword } from "../src/ledger/auth/password";
 import {
   PAYMENT_METHODS,
   REFUND_REASONS,
@@ -92,6 +93,12 @@ const DECISION_NOTES: Partial<Record<RefundStatus, string[]>> = {
   ],
 };
 
+/**
+ * Synthetic demo password for the seeded prototype accounts. Override with
+ * LEDGER_DEMO_PASSWORD; only the scrypt hash is ever stored.
+ */
+const DEMO_PASSWORD = process.env.LEDGER_DEMO_PASSWORD ?? "ledger-demo";
+
 const NOW = new Date("2026-08-15T18:00:00.000Z");
 const iso = (daysAgo: number, hourOffset = 0) =>
   new Date(NOW.getTime() - daysAgo * 86_400_000 + hourOffset * 3_600_000).toISOString();
@@ -119,6 +126,7 @@ function seed(): void {
 
   db.exec(`
     PRAGMA foreign_keys = OFF;
+    DELETE FROM sessions;
     DELETE FROM audit_events;
     DELETE FROM refunds;
     DELETE FROM transactions;
@@ -128,7 +136,8 @@ function seed(): void {
   `);
 
   const insertUser = db.prepare(
-    "INSERT INTO users (id, name, email, role) VALUES (?, ?, ?, ?)",
+    `INSERT INTO users (id, name, email, role, password_hash, failed_attempts, locked_until)
+     VALUES (?, ?, ?, ?, ?, 0, NULL)`,
   );
   const insertCustomer = db.prepare(
     "INSERT INTO customers (id, name, email, risk_tier, created_at) VALUES (?, ?, ?, ?, ?)",
@@ -147,7 +156,13 @@ function seed(): void {
 
   const seedAll = db.transaction(() => {
     for (const user of USERS) {
-      insertUser.run(user.id, user.name, user.email, user.role);
+      insertUser.run(
+        user.id,
+        user.name,
+        user.email,
+        user.role,
+        hashPassword(DEMO_PASSWORD),
+      );
     }
 
     const customerIds: string[] = [];
@@ -334,6 +349,9 @@ function seed(): void {
   console.log(
     `Seeded The Ledger: ${counts?.customers} customers, ${counts?.transactions} transactions, ` +
       `${counts?.refunds} refunds, ${counts?.events} audit events (run id ${randomUUID().slice(0, 8)}).`,
+  );
+  console.log(
+    `Sign in with ${USERS.map((user) => user.email).join(" / ")} — password: ${DEMO_PASSWORD}`,
   );
 }
 

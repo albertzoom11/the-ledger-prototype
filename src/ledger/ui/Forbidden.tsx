@@ -22,7 +22,7 @@ export function Forbidden({
     <div className="max-w-xl">
       <ErrorState
         title="403 — Not authorized"
-        description={`This page requires the "${permission}" permission. You are signed in as ${ROLE_LABELS[role]}. Switch to an Admin using the identity switcher to continue.`}
+        description={`This page requires the "${permission}" permission. You are signed in as ${ROLE_LABELS[role]}. Sign in with an Admin account to continue.`}
         retry={
           <div className="mt-2">
             <ButtonLink href={backHref} variant="secondary" size="sm">

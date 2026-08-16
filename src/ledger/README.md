@@ -12,7 +12,7 @@ refunds exist. That rule is enforced by ESLint: `src/ledger/**` may not import
 | `action/defineAction.ts` | The only way to mutate: validate (zod) → authorize → run the handler → audit, including `DENIED` and `REJECTED_BY_RULE` outcomes. |
 | `audit/` | The append-only event log and its timeline component. |
 | `data/` | The database handle, the platform schema (`users`, `audit_events`), `applySchema()` for application schemas, and `defineQuery`/`buildWhere` for filtered, sorted, paginated reads. |
-| `shell/` | `AppShell`, the permission-filtered `SideNav`, the identity switcher. |
+| `shell/` | `AppShell`, the permission-filtered `SideNav`, the sign-out control. |
 | `ui/` | `DataTable`, `Pagination`, `FilterBar`, `StatusTabs`, `StatusBadge`, `ConfirmDialog`, `Card`/`PageHeader`/`DescriptionList`, form fields, empty/error/skeleton states, `Forbidden`, `listView.ts` (the query-string contract) and money/date formatting. |
 | `admin/` | The platform's own application: audit log and access-control screens, registered through the same manifest shape as a business app. |
 

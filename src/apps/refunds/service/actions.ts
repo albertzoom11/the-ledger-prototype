@@ -1,15 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getActor } from "@/platform/access";
 import type { ActionError } from "@/ledger/action/defineAction";
+import { getActor } from "@/platform/access";
+import type { RefundStatus } from "../domain/types";
 import { decideRefund } from "./refundDecisions";
-
-/**
- * Server actions are a thin transport layer: they resolve the actor from the
- * session and delegate to the audited business action. No authorization logic
- * lives in the UI.
- */
 
 export interface DecisionFormState {
   status: "idle" | "success" | "error";
@@ -17,13 +12,33 @@ export interface DecisionFormState {
   error?: ActionError;
 }
 
-export async function submitRefundDecision(
-  decision: "APPROVE" | "REJECT" | "ESCALATE",
-  refundId: string,
-  note: string,
-): Promise<DecisionFormState> {
+export interface DecisionRequest {
+  decision: "APPROVE" | "REJECT" | "ESCALATE";
+  refundId: string;
+  note: string;
+  expectedStatus: RefundStatus;
+}
+
+export async function submitRefundDecision({
+  decision,
+  refundId,
+  note,
+  expectedStatus,
+}: DecisionRequest): Promise<DecisionFormState> {
   const actor = await getActor();
-  const result = await decideRefund(decision, { refundId, note }, actor);
+  if (!actor) {
+    return {
+      status: "error",
+      message: "Your session has expired. Sign in again to record this decision.",
+      error: { code: "UNAUTHENTICATED", message: "No active session" },
+    };
+  }
+
+  const result = await decideRefund(
+    decision,
+    { refundId, note, expectedStatus },
+    actor,
+  );
 
   if (!result.ok) {
     return { status: "error", message: result.error.message, error: result.error };

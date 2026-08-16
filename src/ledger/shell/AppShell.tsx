@@ -2,9 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Actor } from "../auth/actor";
 import { ROLE_LABELS } from "../auth/roles";
-import type { UserRecord } from "../auth/users";
 import { navGroupsFor, type LedgerApp } from "../apps/registry";
-import { ActorSwitcher } from "./ActorSwitcher";
+import { SignOutButton } from "./SignOutButton";
 import { SideNav } from "./SideNav";
 
 /**
@@ -15,12 +14,10 @@ import { SideNav } from "./SideNav";
 
 export function AppShell({
   actor,
-  actors,
   apps,
   children,
 }: {
   actor: Actor;
-  actors: UserRecord[];
   apps: readonly LedgerApp[];
   children: ReactNode;
 }) {
@@ -49,7 +46,7 @@ export function AppShell({
               {ROLE_LABELS[actor.role]} · {actor.email}
             </div>
           </div>
-          <ActorSwitcher actor={actor} actors={actors} />
+          <SignOutButton />
         </div>
       </header>
 

@@ -3,7 +3,7 @@ import type { Role } from "./roles";
 
 /**
  * An Actor is whoever is performing an action. In production this comes from
- * the identity provider; in the prototype it comes from a cookie. Everything
+ * the identity provider; here it comes from a server-side session. Everything
  * downstream (services, audit log) only depends on this shape.
  *
  * The actor's permissions are resolved once, from the access policy, when the

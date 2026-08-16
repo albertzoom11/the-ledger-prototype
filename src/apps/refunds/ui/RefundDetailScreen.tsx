@@ -148,6 +148,7 @@ export function RefundDetailScreen({
               currency={refund.currency}
               terminal={isTerminal(refund.status)}
               options={availableDecisions}
+              expectedStatus={refund.status}
             />
           </Card>
 

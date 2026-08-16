@@ -20,11 +20,17 @@ import type {
   RiskTier,
   Transaction,
 } from "../domain/types";
+import { ensureRefundsSchema } from "./schema";
 
 /**
  * Refunds data access. All reads/writes for the application live here and are
  * built out of the Ledger data primitives (defineQuery, buildWhere, ...).
+ *
+ * The application's own tables are installed on first use, so a server action
+ * that runs before any page render still finds them.
  */
+
+ensureRefundsSchema();
 
 const REFUND_FROM = `
   FROM refunds r
@@ -123,24 +129,36 @@ export function statusCounts(filters: Filter[] = []): Record<RefundStatus, numbe
 
 export interface RefundStateUpdate {
   status: RefundStatus;
+  fromStatus: RefundStatus;
   reviewerId: string;
   reviewedAt: string;
   decisionNote: string | null;
 }
 
-export function updateRefundState(id: string, update: RefundStateUpdate): void {
+/**
+ * Applies a state transition only if the row is still in `fromStatus`, so two
+ * reviewers deciding the same refund cannot both win. Returns false when the
+ * row moved underneath the caller.
+ */
+export function updateRefundState(
+  id: string,
+  update: RefundStateUpdate,
+): boolean {
   const params: SqlParam[] = [
     update.status,
     update.reviewerId,
     update.reviewedAt,
     update.decisionNote,
     id,
+    update.fromStatus,
   ];
-  execute(
-    `UPDATE refunds
-        SET status = ?, reviewer_id = ?, reviewed_at = ?, decision_note = ?
-      WHERE id = ?`,
-    params,
+  return (
+    execute(
+      `UPDATE refunds
+          SET status = ?, reviewer_id = ?, reviewed_at = ?, decision_note = ?
+        WHERE id = ? AND status = ?`,
+      params,
+    ) === 1
   );
 }
 

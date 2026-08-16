@@ -1,13 +1,12 @@
 import { RefundQueueScreen } from "@/apps/refunds/ui/RefundQueueScreen";
 import type { SearchParams } from "@/ledger/ui/listView";
-import { getActor } from "@/platform/access";
+import { requireActor } from "@/platform/access";
 
 export default async function RefundQueuePage({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  return (
-    <RefundQueueScreen actor={await getActor()} searchParams={searchParams} />
-  );
+  const actor = await requireActor("/refunds");
+  return <RefundQueueScreen actor={actor} searchParams={searchParams} />;
 }

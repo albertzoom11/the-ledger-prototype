@@ -12,7 +12,7 @@ import {
   nextStatusFor,
   type RefundDecision,
 } from "../domain/rules";
-import type { RefundListItem } from "../domain/types";
+import { REFUND_STATUSES, type RefundListItem } from "../domain/types";
 import { REFUND_PERMISSIONS } from "../app";
 
 /**
@@ -27,7 +27,7 @@ const decisionInput = z.object({
   refundId: z.string().min(1),
   note: z.string().max(1000).default(""),
   /** Optimistic-concurrency guard: the status the reviewer was looking at. */
-  expectedStatus: z.string().optional(),
+  expectedStatus: z.enum(REFUND_STATUSES).optional(),
 });
 
 export type DecisionInput = z.infer<typeof decisionInput>;
@@ -38,6 +38,9 @@ export interface DecisionOutput {
   to: string;
   amountCents: number;
 }
+
+const STALE_VIEW_MESSAGE =
+  "This refund changed while you were reviewing it. Reload the refund to see its current state.";
 
 function loadRefund(refundId: string): RefundListItem {
   const refund = findRefundById(refundId);
@@ -68,15 +71,22 @@ function makeDecisionAction(
     input: decisionInput,
     handler: (input, { actor }) => {
       const refund = loadRefund(input.refundId);
+      if (input.expectedStatus && input.expectedStatus !== refund.status) {
+        throw new RuleViolationError(STALE_VIEW_MESSAGE);
+      }
       assertDecisionAllowed(refund, decision, actor, input.note);
 
       const nextStatus = nextStatusFor(decision);
-      updateRefundState(refund.id, {
+      const applied = updateRefundState(refund.id, {
         status: nextStatus,
+        fromStatus: refund.status,
         reviewerId: actor.id,
         reviewedAt: new Date().toISOString(),
         decisionNote: input.note.trim() ? input.note.trim() : null,
       });
+      if (!applied) {
+        throw new RuleViolationError(STALE_VIEW_MESSAGE);
+      }
 
       return {
         refundId: refund.id,
